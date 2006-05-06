@@ -34,7 +34,7 @@ Installation
 Edit configuration file config-example.cfg and rename it to config.cfg (by 
 default).
 
-Give right permisions for "data" directory.
+Give right permisions for "data" directory to allow write it.
 
 Execute JFN using:
     python jfn.py &
