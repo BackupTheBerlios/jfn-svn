@@ -17,6 +17,8 @@ JFN will need:
     - Python <http://www.python.org>, version >=2.4
     - xmpppy <http://xmpppy.sourceforge.net>, version >=3.0
     - feedparser <http://feedparser.org>, version =4.1
+        - (recommended) iconv_codec and cjkcodecs <http://cjkpython.i18n.org>, 
+        for feedparser's charset detection
     - Durus <http://www.mems-exchange.org/software/durus/>, version =3.3. 
     JFN use this as database (no SQL), it's a Persistence System.
 
