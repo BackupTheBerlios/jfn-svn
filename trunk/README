@@ -1,0 +1,59 @@
+
+PyXMPP -- Python Jabber/XMPPP implementation
+________________________________________________________________________________
+
+
+Introduction
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+Jabber Feed Notifier [JFN] is a Jabber client/component that send notifications 
+of new feeds entries. You can configure it to send you only notifications, 
+summary message or full message, and more. In addition, you can send your OPML 
+file.
+
+
+Requirements
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+JFN will need:
+    - Python <http://www.python.org>, version >=2.4
+    - xmpppy <http://xmpppy.sourceforge.net>, version >=3.0
+    - feedparser <http://feedparser.org>, version =4.1
+    - Durus <http://www.mems-exchange.org/software/durus/>, version =3.3. 
+    JFN use this as database (no SQL), it's a Persistence System.
+
+
+Download
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+Get the latest stable versions 
+<http://developer.berlios.de/project/filelist.php?group_id=6632> from BerliOS 
+files system or development version with experimental features 
+<http://developer.berlios.de/svn/?group_id=6632> fom BerliOS SVN.
+
+
+Installation
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+Edit configuration file config-example.cfg and rename it to config.cfg (by 
+default).
+
+Give right permisions for "data" directory.
+
+Execute JFN using:
+    python jfn.py &
+or:
+    ./jfn.py &
+
+
+Contact
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+JFN was written and is maintained by Sergio Álvarez <mail@xergio.net>
+
+Use the project page on BerliOS <http://developer.berlios.de/projects/jfn/> to 
+report bugs, request features, etc.
+
+There are a mailing list <http://developer.berlios.de/mail/?group_id=6632> for
+discussions.
+
+
+Licence
+¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+JFN is free software, licenced under the GNU GPL. See the COPYING file for 
+details.
