@@ -58,9 +58,16 @@ class CFeed(Persistent):
 class CUser(Persistent):
     def __init__(self, jid):
         self.jid = jid
-        self.items_pending = PersistentSet()
+        self.items_pending = PersistentDict() # {sha1(title+text) : CItem, ...}
         self.config = PersistentDict()
         self.feeds = PersistentSet()
+        
+class CItem(Persistent):
+    def __init__(self, sha1, title = '', text = '', dte = ''):
+        self.sha1 = sha1
+        self.title = title
+        self.text = text
+        self.dte = dte
 
 conndurus = Connection(FileStorage(CONFIG['durus_file']))
 root = conndurus.get_root()
@@ -81,24 +88,44 @@ class JFNCrawler(threading.Thread):
     def __init__(self, stp=False):
         threading.Thread.__init__(self)
         self.stp = stp
+        self.nexturl = '' # next url for check
         
     def run(self):
         while not self.stp:
             time.sleep(1)
             urls = feeds.keys()
             for url in urls:
+                self.nexturl = url
+                time.sleep(60 / len(urls))
                 self.checkFeed(url)
                 
     def stop(self):
         self.stp = True
+        
+    def getNextUrl(self):
+        return self.nexturl
 
     def checkFeed(self, feedUrl):
-        try:
-            fp = feedparser.parse(feedUrl)
-            if fp.bozo == 0:
-                pass
-        except:
-            pass
+        #try:
+        txt = None
+        feed = feeds[feedUrl]
+        fp = feedparser.parse(feedUrl)
+        if fp.get('bozo') != None and fp['bozo'] == 0:
+            feed.title = fp.feed.title
+            feed.url = fp.feed.link
+            #if len(fp['entries']) > 0:
+            #    for entry in fp['entries']:
+            #        txt += "\n--- %s -- %s" % (entry['title'], entry['updated'])
+        
+        elif not fp.get('bozo'):
+            txt = "*JFN Dump*\n%r" % fp
+        elif bozo != 0:
+            txt = "*JFN Error*\n%r" % fp['bozo_exception']
+            
+        if txt:
+            XMPP.send(Message(to = 'xergio@jabberland.com', body = txt, typ = 'chat'))
+        #except:
+            #pass
 
 
 
@@ -148,6 +175,7 @@ def messageHandler(conn, mess_node):
     if body:
         if jid in CONFIG['admins']:
             if body.lower() == "quit":
+                crawler.stop()
                 sys.exit()
             
             if body.lower() == "reprroster":
@@ -165,10 +193,11 @@ def messageHandler(conn, mess_node):
                     
             elif body.startswith("eval"):
                 reply = "*EVAL*"
-                try:
-                    reply += "\n%r" % eval(body[5:])
-                except:
-                     reply += "\nAlgo ha fallado... :("
+                #try:
+                #    reply += "\n%r" % eval(body[5:])
+                #except:
+                #     reply += "\nAlgo ha fallado... :(\n\n%r" % sys.exc_info()[0]
+                reply += "\n%r" % eval(body[5:])
         
         """Add new feeds"""
         if body.startswith("add http"):
@@ -226,6 +255,7 @@ def messageHandler(conn, mess_node):
 if __name__ == "__main__":
     try:
         # Born a client
+        global XMPP
         XMPP = Client(CONFIG['jid'].getDomain())
         
         # ...connect it to SSL port directly
@@ -249,8 +279,9 @@ if __name__ == "__main__":
         # ...obtain roster and become available
         XMPP.sendInitPresence()
         
-        #crawler = JFNCrawler()
-        #crawler.start()
+        global crawler
+        crawler = JFNCrawler()
+        crawler.start()
     
         while 1:
             XMPP.Process(1)
