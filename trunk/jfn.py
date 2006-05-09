@@ -111,18 +111,27 @@ class JFNCrawler(threading.Thread):
         txt = None
         feed = feeds[feedUrl]
         fp = feedparser.parse(feedUrl)
+        # if no error
         if fp.get('bozo') != None and fp['bozo'] == 0:
+            #update feed basic data
             feed.title = fp.feed.title
             feed.url = fp.feed.link
+            # if there are items
             if fp.get('entries') and len(fp['entries']) > 0:
+                # ... we search the oldest
+                max_date = ()
                 for entry in fp['entries']:
                     #print sha.new(entry['title'] + entry['summary'])
+                    if max_date < entry.updated_parsed:
+                        max_date = entry.updated_parsed
                     pass
+                feed.last_item_date = max_date
         
         elif not fp.get('bozo'):
             txt = "*JFN Dump*\n%r" % fp
-        elif bozo != 0:
+        elif fp.bozo != 0:
             txt = "*JFN Error*\n%r" % fp['bozo_exception']
+            feed.errors += 1
             
         if txt:
             XMPP.send(Message(to = 'xergio@jabberland.com', body = txt, typ = 'chat'))
