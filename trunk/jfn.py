@@ -13,6 +13,7 @@ sys.path.insert(1, '.')
 import os
 import threading
 import time
+import sha
 from xmpp import *
 import feedparser
 
@@ -113,9 +114,10 @@ class JFNCrawler(threading.Thread):
         if fp.get('bozo') != None and fp['bozo'] == 0:
             feed.title = fp.feed.title
             feed.url = fp.feed.link
-            #if len(fp['entries']) > 0:
-            #    for entry in fp['entries']:
-            #        txt += "\n--- %s -- %s" % (entry['title'], entry['updated'])
+            if fp.get('entries') and len(fp['entries']) > 0:
+                for entry in fp['entries']:
+                    #print sha.new(entry['title'] + entry['summary'])
+                    pass
         
         elif not fp.get('bozo'):
             txt = "*JFN Dump*\n%r" % fp
@@ -131,6 +133,22 @@ class JFNCrawler(threading.Thread):
 
 def presenceHandler(conn, pres_node):
     print ">>> PRESENCE", pres_node.getFrom(), pres_node.getType(), pres_node.getShow()
+    setCustomPresenceStatus(pres_node.getFrom())
+    
+    
+    
+    
+def setCustomPresenceStatus(to_jid):
+    jid = JID(to_jid)
+    p_i = len(users[jid.getStripped()].items_pending)
+    statusmsg = "You haven't pending items."
+    if p_i > 0:
+        statusmsg = "You have %d item" % p_i
+        if p_i > 1:
+             statusmsg += "s"
+        statusmsg += " unreaded."
+    p = Presence(to=to_jid, status=statusmsg)
+    XMPP.send(p)
     
     
 
@@ -289,6 +307,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print u"\nKeyboardInterrupt..."
         crawler.stop()
+        crawler = None
         sys.exit(1)
         
     #except:
