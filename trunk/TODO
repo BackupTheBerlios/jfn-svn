@@ -1,8 +1,11 @@
-all?
+mmm... all? :P
 
 And...
-- Component support
-- Extend user preferences
-- Modular schema
-- jcea's BerkeleyDB Backend Storage Engine for DURUS support
-- Web output
+- [0]   Component support
+- [100] Extend user preferences
+- [255] Modular schema
+- [20]  jcea's BerkeleyDB Backend Storage Engine for DURUS support
+- [10]  Web output
+
+Legend:
+[0-9]+ = Priority
