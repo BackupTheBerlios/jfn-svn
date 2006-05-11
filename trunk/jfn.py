@@ -44,6 +44,7 @@ from durus.connection import Connection
 from durus.persistent import Persistent
 from durus.persistent_set import PersistentSet
 from durus.persistent_dict import PersistentDict
+from durus.persistent_list import PersistentList
 
 # we use this like a struct in C. Attributes: feed url, title, url, description, 
 #    items{} as sha1(item title + description): item date
@@ -59,13 +60,12 @@ class CFeed(Persistent):
 class CUser(Persistent):
     def __init__(self, jid):
         self.jid = jid
-        self.items_pending = PersistentDict() # {sha1(title+text) : CItem, ...}
+        self.items_pending = PersistentList() # [CItem, ...]
         self.config = PersistentDict()
         self.feeds = PersistentSet()
         
 class CItem(Persistent):
-    def __init__(self, sha1, title = '', text = '', dte = ''):
-        self.sha1 = sha1
+    def __init__(self, title = '', text = '', dte = ''):
         self.title = title
         self.text = text
         self.dte = dte
@@ -119,13 +119,23 @@ class JFNCrawler(threading.Thread):
             # if there are items
             if fp.get('entries') and len(fp['entries']) > 0:
                 # ... we search the oldest
-                max_date = ()
+                fp['entries'].reverse()
                 for entry in fp['entries']:
                     #print sha.new(entry['title'] + entry['summary'])
-                    if max_date < entry.updated_parsed:
-                        max_date = entry.updated_parsed
-                    pass
-                feed.last_item_date = max_date
+                    if feed.last_item_date < entry.updated_parsed:
+                        feed.last_item_date = entry.updated_parsed
+                        
+                        # add this item in each user
+                        for userjid in feed.users:
+                            ci = CItem()
+                            if entry.get('title'): ci.title = entry.title
+                            if entry.get('summary'): ci.text = entry.summary
+                            if entry.get('updated'): ci.dte = entry.updated
+                            users[userjid].items_pending.append(ci)
+                            
+                            while len(users[userjid].items_pending) > 100:
+                                temp = users[userjid].items_pending[0]
+                                users[userjid].items_pending.remove(temp)
         
         elif not fp.get('bozo'):
             txt = "*JFN Dump*\n%r" % fp
@@ -148,16 +158,17 @@ def presenceHandler(conn, pres_node):
     
     
 def setCustomPresenceStatus(to_jid):
-    jid = JID(to_jid)
-    p_i = len(users[jid.getStripped()].items_pending)
-    statusmsg = "You haven't pending items."
-    if p_i > 0:
-        statusmsg = "You have %d item" % p_i
-        if p_i > 1:
-             statusmsg += "s"
-        statusmsg += " unreaded."
-    p = Presence(to=to_jid, status=statusmsg)
-    XMPP.send(p)
+    jid = JID(to_jid).getStripped()
+    if users.get(jid):
+        p_i = len(users[jid].items_pending)
+        statusmsg = "You haven't pending items."
+        if p_i > 0:
+            statusmsg = "You have %d item" % p_i
+            if p_i > 1:
+                 statusmsg += "s"
+            statusmsg += " unreaded."
+        p = Presence(to=to_jid, status=statusmsg)
+        XMPP.send(p)
     
     
 
@@ -220,11 +231,10 @@ def messageHandler(conn, mess_node):
                     
             elif body.startswith("eval"):
                 reply = "*EVAL*"
-                #try:
-                #    reply += "\n%r" % eval(body[5:])
-                #except:
-                #     reply += "\nAlgo ha fallado... :(\n\n%r" % sys.exc_info()[0]
-                reply += "\n%r" % eval(body[5:])
+                try:
+                    reply += "\n%r" % eval(body[5:])
+                except:
+                     reply += "\nAlgo ha fallado... :(\n\n%r" % sys.exc_info()[0]
         
         """Add new feeds"""
         if body.startswith("add http"):
