@@ -88,11 +88,11 @@ users = root['users']
 class JFNCrawler(threading.Thread):
     def __init__(self, stp=False):
         threading.Thread.__init__(self)
-        self.stp = stp
+        self._stp = stp
         self.nexturl = '' # next url for check
         
     def run(self):
-        while not self.stp:
+        while not self._stp:
             time.sleep(1)
             urls = feeds.keys()
             for url in urls:
@@ -101,12 +101,15 @@ class JFNCrawler(threading.Thread):
                 self.checkFeed(url)
                 
     def stop(self):
-        self.stp = True
+        """Method to kill the thread"""
+        self._stp = True
         
     def getNextUrl(self):
+        """Return the next url for check"""
         return self.nexturl
 
     def checkFeed(self, feedUrl):
+        """Retrieve and parse a feed""" 
         #try:
         txt = None
         feed = feeds[feedUrl]
@@ -151,6 +154,7 @@ class JFNCrawler(threading.Thread):
 
 
 def presenceHandler(conn, pres_node):
+    """Presence handler"""
     print ">>> PRESENCE", pres_node.getFrom(), pres_node.getType(), pres_node.getShow()
     setCustomPresenceStatus(pres_node.getFrom())
     
@@ -158,6 +162,7 @@ def presenceHandler(conn, pres_node):
     
     
 def setCustomPresenceStatus(to_jid):
+    """Set up presence message status for each user"""
     jid = JID(to_jid).getStripped()
     if users.get(jid):
         p_i = len(users[jid].items_pending)
@@ -174,6 +179,7 @@ def setCustomPresenceStatus(to_jid):
 
 # if people wants to un/subscribe this bot, we too
 def subscriptionsHandler(conn, pres_node):
+    """Subscription handler"""
     tipo = pres_node.getType()
     
     print ">>> SUBSCRIPTION", pres_node.getFrom(), tipo
@@ -194,6 +200,7 @@ def subscriptionsHandler(conn, pres_node):
 
 # reply the version request
 def iqVersion(conn, iq_node):
+    """IQ Version request"""
     i = Iq(typ='result', queryNS='jabber:iq:version', to=iq_node.getFrom(), payload=[Node('name',payload=['xmpppy'])])
     conn.send(i)
     raise NodeProcessed
@@ -201,6 +208,7 @@ def iqVersion(conn, iq_node):
     
     
 def messageHandler(conn, mess_node):
+    """Message handler"""
     body = mess_node.getBody()
     sbody = body.split(" ")
     reply = None
