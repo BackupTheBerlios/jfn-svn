@@ -14,6 +14,8 @@ import os
 import threading
 import time
 import sha
+import base64
+import re
 from xmpp import *
 import feedparser
 
@@ -102,7 +104,7 @@ class JFNCrawler(threading.Thread):
             urls = feeds.keys()
             for url in urls:
                 self.checkFeed(url)
-                self.sendNotifications(url)
+                self.feedNotifications(url)
                 conndurus.commit()
                 
     def stop(self):
@@ -170,12 +172,29 @@ class JFNCrawler(threading.Thread):
         #except:
             #pass
 
-    def sendNotifications(self, feedUrl):
-        """Send all pending items for each user"""
+    def feedNotifications(self, feedUrl):
+        """Send all pending items of this feed"""
         feed = feeds[feedUrl]
-        
         for userjid in feed.users:
-            user = users[userjid]
+            userNotifications(userjid, "*New* items for %s\n%s\n" % (feed.title, feed.url))
+            
+            
+            
+def userNotifications(userjid, initialtext = None):
+    """Send notification to some JID"""
+    user = users[userjid]
+    # if the user is conected and have pending items...
+    if not XMPP.getRoster().getShow(user.jid) == None and len(user.items_pending) > 0:
+        if initialtext:
+            XMPP.send(Message(to = user.jid, body = initialtext, typ = 'chat'))
+        user.items_pending.reverse()
+        #we send all items and delete it
+        while len(user.items_pending) > 0:
+            item = user.items_pending.pop()
+            text = "\n%s\n%s" % (re.replace('<.*?>', '', item.title), item.permalink)
+            if item.text != "": text += "\n\n%s" % (re.replace('<.*?>', '', item.text))
+            text += "\n"
+            XMPP.send(Message(to = user.jid, body = text, typ = 'chat'))
             
 
 
