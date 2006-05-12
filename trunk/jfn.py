@@ -131,14 +131,14 @@ class JFNCrawler(threading.Thread):
             # ... we search the oldest
             fp['entries'].reverse()
             for entry in fp['entries']:
-                # generate the item hash: str(item)
-                #if entry.get('title'):
-                #    temp = entry['title']
-                #    if entry.get('link'): temp += entry.link
-                #    if entry.get('summary'): temp += entry.summary
+                # generate the item hash
+                if entry.get('title'):
+                    temp = repr(entry['title'])
+                    if entry.get('link'): temp += repr(entry.link)
+                    if entry.get('summary'): temp += repr(entry.summary)
                 #else: temp = str(entry)
                 # this have a problem: UnicodeEncodeError... 
-                temphash = sha.new(repr(entry)).hexdigest()
+                temphash = sha.new(temp).hexdigest()
 
                 if not temphash in feed.last_items:
                     feed.last_items.append(temphash)
@@ -157,7 +157,7 @@ class JFNCrawler(threading.Thread):
                             users[userjid].items_pending.remove(temp)
                 #delete obsolete hashes from feeds, no more than 50
                 while len(feed.last_items) > 50:
-                    temp = feed.items_pending[0]
+                    temp = feed.last_items[0]
                     feed.last_items.remove(temp)
 
         elif fp.bozo != 0:
@@ -176,7 +176,7 @@ class JFNCrawler(threading.Thread):
         """Send all pending items of this feed"""
         feed = feeds[feedUrl]
         for userjid in feed.users:
-            userNotifications(userjid, "*New* items for %s\n%s\n" % (feed.title, feed.url))
+            userNotifications(userjid, "*New* items for %s (%s)" % (feed.title, feed.url))
             
             
             
@@ -184,15 +184,15 @@ def userNotifications(userjid, initialtext = None):
     """Send notification to some JID"""
     user = users[userjid]
     # if the user is conected and have pending items...
-    if not XMPP.getRoster().getShow(user.jid) == None and len(user.items_pending) > 0:
+    if len(XMPP.getRoster().getResources(user.jid)) > 0 and len(user.items_pending) > 0:
         if initialtext:
             XMPP.send(Message(to = user.jid, body = initialtext, typ = 'chat'))
         user.items_pending.reverse()
         #we send all items and delete it
         while len(user.items_pending) > 0:
             item = user.items_pending.pop()
-            text = "\n%s\n%s" % (re.replace('<.*?>', '', item.title), item.permalink)
-            if item.text != "": text += "\n\n%s" % (re.replace('<.*?>', '', item.text))
+            text = "\n*%s*\n%s" % (re.sub('<.*?>', '', item.title), item.permalink)
+            if item.text != "": text += "\n\n%s" % (re.sub('<.*?>', '', item.text))
             text += "\n"
             XMPP.send(Message(to = user.jid, body = text, typ = 'chat'))
             
@@ -202,6 +202,7 @@ def userNotifications(userjid, initialtext = None):
 def presenceHandler(conn, pres_node):
     """Presence handler"""
     print ">>> PRESENCE", pres_node.getFrom(), pres_node.getType(), pres_node.getShow()
+    userNotifications(JID(pres_node.getFrom()).getStripped())
     setCustomPresenceStatus(pres_node.getFrom())
     
     
