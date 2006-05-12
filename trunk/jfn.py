@@ -26,7 +26,7 @@ CONFIG = {
     'server':       'server.com',
     'port':         5223,
     'durus_file':   'data/feeds.durus',
-    'admins':       ['your@jid']
+    'admins':       [] # admin jids
 }
 
 # load configuration
@@ -34,6 +34,10 @@ pf = open(CONFIG_FILE, 'r')
 CONFIG.update(eval(pf.read()))
 pf.close()
 CONFIG['jid'] = JID(CONFIG['jid'])
+
+
+
+VERSION = "beta/unstable"
 
 
 
@@ -53,7 +57,7 @@ class CFeed(Persistent):
         self.feed = feed
         self.title = ''
         self.url = ''
-        self.last_item_date = ()
+        self.last_items = PersistentList() # last 50, for example
         self.errors = 0
         self.users = PersistentSet()
       
@@ -65,9 +69,10 @@ class CUser(Persistent):
         self.feeds = PersistentSet()
         
 class CItem(Persistent):
-    def __init__(self, title = '', text = '', dte = ''):
+    def __init__(self, title = '', text = '', plink = '', dte = ''):
         self.title = title
         self.text = text
+        self.permalink = plink
         self.dte = dte
 
 conndurus = Connection(FileStorage(CONFIG['durus_file']))
@@ -96,9 +101,9 @@ class JFNCrawler(threading.Thread):
             time.sleep(1)
             urls = feeds.keys()
             for url in urls:
-                self.nexturl = url
-                time.sleep(60 / len(urls))
                 self.checkFeed(url)
+                self.sendNotifications(url)
+                conndurus.commit()
                 
     def stop(self):
         """Method to kill the thread"""
@@ -114,42 +119,64 @@ class JFNCrawler(threading.Thread):
         txt = None
         feed = feeds[feedUrl]
         fp = feedparser.parse(feedUrl)
-        # if no error
-        if fp.get('bozo') != None and fp['bozo'] == 0:
-            #update feed basic data
-            feed.title = fp.feed.title
-            feed.url = fp.feed.link
-            # if there are items
-            if fp.get('entries') and len(fp['entries']) > 0:
-                # ... we search the oldest
-                fp['entries'].reverse()
-                for entry in fp['entries']:
-                    #print sha.new(entry['title'] + entry['summary'])
-                    if feed.last_item_date < entry.updated_parsed:
-                        feed.last_item_date = entry.updated_parsed
-                        
-                        # add this item in each user
-                        for userjid in feed.users:
-                            ci = CItem()
-                            if entry.get('title'): ci.title = entry.title
-                            if entry.get('summary'): ci.text = entry.summary
-                            if entry.get('updated'): ci.dte = entry.updated
-                            users[userjid].items_pending.append(ci)
-                            
-                            while len(users[userjid].items_pending) > 100:
-                                temp = users[userjid].items_pending[0]
-                                users[userjid].items_pending.remove(temp)
+
+        #update feed basic data
+        if fp.feed.get('title'): feed.title = fp.feed.title
+        if fp.feed.get('link'): feed.url = fp.feed.link
         
-        elif not fp.get('bozo'):
-            txt = "*JFN Dump*\n%r" % fp
+        # if there are items
+        if fp.get('entries') and len(fp['entries']) > 0:
+            # ... we search the oldest
+            fp['entries'].reverse()
+            for entry in fp['entries']:
+                # generate the item hash: str(item)
+                #if entry.get('title'):
+                #    temp = entry['title']
+                #    if entry.get('link'): temp += entry.link
+                #    if entry.get('summary'): temp += entry.summary
+                #else: temp = str(entry)
+                # this have a problem: UnicodeEncodeError... 
+                temphash = sha.new(repr(entry)).hexdigest()
+
+                if not temphash in feed.last_items:
+                    feed.last_items.append(temphash)
+                    # ...add this item for each user
+                    for userjid in feed.users:
+                        ci = CItem()
+                        if entry.get('title'): ci.title = entry.title
+                        if entry.get('summary'): ci.text = entry.summary
+                        if entry.get('link'): ci.permalink = entry.link
+                        if entry.get('updated'): ci.dte = entry.updated
+                        users[userjid].items_pending.append(ci)
+                        
+                        #delete obsolete items from users, no more than 100
+                        while len(users[userjid].items_pending) > 100:
+                            temp = users[userjid].items_pending[0]
+                            users[userjid].items_pending.remove(temp)
+                #delete obsolete hashes from feeds, no more than 50
+                while len(feed.last_items) > 50:
+                    temp = feed.items_pending[0]
+                    feed.last_items.remove(temp)
+
         elif fp.bozo != 0:
-            txt = "*JFN Error*\n%r" % fp['bozo_exception']
+            txt = "*JFN Error*\n%r\n%r" % (feedUrl, fp['bozo_exception'])
             feed.errors += 1
+        else:
+            feed.errors = 0
             
-        if txt:
-            XMPP.send(Message(to = 'xergio@jabberland.com', body = txt, typ = 'chat'))
+        if txt and len(CONFIG['admins']) > 0:
+            for ajid in CONFIG['admins']:
+                XMPP.send(Message(to = ajid, body = txt, typ = 'chat'))
         #except:
             #pass
+
+    def sendNotifications(self, feedUrl):
+        """Send all pending items for each user"""
+        feed = feeds[feedUrl]
+        
+        for userjid in feed.users:
+            user = users[userjid]
+            
 
 
 
@@ -334,7 +361,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print u"\nKeyboardInterrupt..."
         crawler.stop()
-        crawler = None
         sys.exit(1)
         
     #except:
