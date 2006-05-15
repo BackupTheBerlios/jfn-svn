@@ -179,7 +179,8 @@ def subscriptionsHandler(conn, pres_node):
 # reply the version request
 def iqVersion(conn, iq_node):
     """IQ Version request"""
-    i = Iq(typ='result', queryNS='jabber:iq:version', to=iq_node.getFrom(), payload=[Node('name',payload=['xmpppy'])])
+    i = Iq(typ='result', queryNS='jabber:iq:version', to=iq_node.getFrom(), 
+            payload=[Node('name',payload=['xmpppy'])])
     conn.send(i)
     raise NodeProcessed
     
@@ -224,6 +225,26 @@ def messageHandler(conn, mess_node):
         """
         
         
+        """Show the help"""
+        if body.startswith("help"):
+            reply = """*Help*
+Available commands: add, del, list, import
+
+_ADD_ - Use this to subscribe you a new feed URL.
+Example: add http://digg.com/rss/index.xml
+
+_DEL_ - This command will remove your subsciption for a feed URL.
+Example: del http://digg.com/rss/index.xml
+
+_LIST_ - List all your feeds subscriptions.
+Example: list
+
+_IMPORT_ - This allow you to send a full OPML file with all your feeds and immediately subscribe all them.
+Example: import http://my.server.com/my_feeds.opml
+(currently not available)
+            """
+                
+                
         """Add new feeds"""
         if body.startswith("add http"):
             reply = "*Feed added*"
@@ -247,17 +268,15 @@ def messageHandler(conn, mess_node):
 
 
         """Delete a feed"""
-        """if body.startswith("del http"):
+        if body.startswith("del http"):
             reply = "*Feed deleted*"
             feed = body[4:].strip()
-            if users.get(jid) and users[jid].feeds.has_key(feed) and feeds.get(feed) and jid in feeds[feed].users:
-                del users[jid].feeds[feed]
-                feeds[feed].users.remove(jid)
-                conndurus.commit()
-                reply += "\nURL: %s\nJID: %s\n\nNotifications for this feed closed." % (feed, jid)
+            
+            ok = users.del_feed(jid, feed)
+            if not ok:
+                reply += "\n%s isn't subscribed for %s" % (jid, feed)
             else:
-                reply += "\n%s isn't subscribed in %s" % (jid, feed)
-        """
+                reply += "\nURL: %s\nJID: %s\n\nEnded your notifications for this feed." % (feed, jid)
 
 
     """If we compose a reply to the user, we send it"""

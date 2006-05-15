@@ -21,6 +21,13 @@ class CFeed(Persistent):
             self.users.add(useritem)
             return True
         return False
+        
+        
+    def del_user(self, useritem):
+        if self.has_jid(useritem):
+            self.users.remove(useritem)
+            return True
+        return False
             
             
     def has_jid(self, useritem):

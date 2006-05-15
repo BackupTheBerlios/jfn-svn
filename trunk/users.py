@@ -25,6 +25,14 @@ class CUser(Persistent):
             self.feeds[feeditem] = sendFirstNoti
             return True
         return False
+        
+        
+    def unsubs_feed(self, feeditem):
+        """Delete a feed item from 'feeds' dict."""
+        if self.has_feed(feeditem):
+            del self.feeds[feeditem]
+            return True
+        return False
             
             
     def has_feed(self, feeditem):
@@ -65,6 +73,20 @@ class CUsers(Persistent):
             
         oku = self.data[jid].subs_feed(self.feeds[feed])
         okf = self.feeds[feed].add_user(self.data[jid])
+            
+        self.conndurus.commit()
+        
+        return oku and okf
+        
+    
+    def del_feed(self, jid, feed):
+        """Delete an user subscription."""
+
+        tempfeed = self.feeds.get(feed)
+        tempuser = self.data.get(jid)
+            
+        oku = self.data[jid].unsubs_feed(tempfeed)
+        okf = self.feeds[feed].del_user(tempuser)
             
         self.conndurus.commit()
         
