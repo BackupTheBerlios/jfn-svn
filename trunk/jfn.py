@@ -1,13 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-
-
-# Small config
-CONFIG_FILE = "config.cfg"
-
-
-
 import sys
 sys.path.insert(1, '.')
 import os
@@ -18,77 +11,12 @@ import base64
 import re
 from xmpp import *
 import feedparser
+from config import CONFIG
+from users import CUsers
 
 
 
-# sample config, you must edit CONFIG_FILE file
-CONFIG = {
-    'jid':          'jfn@server.com/Jabber Feed Notifier',
-    'pass':         'secret pass',
-    'server':       'server.com',
-    'port':         5223,
-    'durus_file':   'data/feeds.durus',
-    'admins':       [] # admin jids
-}
-
-# load configuration
-pf = open(CONFIG_FILE, 'r')
-CONFIG.update(eval(pf.read()))
-pf.close()
-CONFIG['jid'] = JID(CONFIG['jid'])
-
-
-
-VERSION = "beta/unstable"
-
-
-
-# durus file storage
-from durus.btree import BTree
-from durus.file_storage import FileStorage
-from durus.connection import Connection
-from durus.persistent import Persistent
-from durus.persistent_set import PersistentSet
-from durus.persistent_dict import PersistentDict
-from durus.persistent_list import PersistentList
-
-# we use this like a struct in C. Attributes: feed url, title, url, description, 
-#    items{} as sha1(item title + description): item date
-class CFeed(Persistent):
-    def __init__(self, feed):
-        self.feed = feed
-        self.title = ''
-        self.url = ''
-        self.last_items = PersistentList() # last 50, for example
-        self.errors = 0
-        self.users = PersistentSet()
-      
-class CUser(Persistent):
-    def __init__(self, jid):
-        self.jid = jid
-        self.items_pending = PersistentList() # [CItem, ...]
-        self.config = PersistentDict()
-        self.feeds = PersistentSet()
-        
-class CItem(Persistent):
-    def __init__(self, title = '', text = '', plink = '', dte = ''):
-        self.title = title
-        self.text = text
-        self.permalink = plink
-        self.dte = dte
-
-conndurus = Connection(FileStorage(CONFIG['durus_file']))
-root = conndurus.get_root()
-
-if not root.get('feeds'):
-    root['feeds'] = BTree()
-    conndurus.commit()
-if not root.get('users'):
-    root['users'] = BTree()
-    conndurus.commit()
-    
-feeds = root['feeds']
-users = root['users']
+users = CUsers()
 
 
 
@@ -176,7 +104,10 @@ class JFNCrawler(threading.Thread):
         """Send all pending items of this feed"""
         feed = feeds[feedUrl]
         for userjid in feed.users:
-            userNotifications(userjid, "*New* items for %s (%s)" % (feed.title, feed.url))
+            if users[userjid].feeds[feed]:
+                userNotifications(userjid, "*New* items for %s (%s)" % (feed.title, feed.url))
+            else:
+                users[userjid].feeds[feed] = True
             
             
             
@@ -202,8 +133,8 @@ def userNotifications(userjid, initialtext = None):
 def presenceHandler(conn, pres_node):
     """Presence handler"""
     print ">>> PRESENCE", pres_node.getFrom(), pres_node.getType(), pres_node.getShow()
-    userNotifications(JID(pres_node.getFrom()).getStripped())
-    setCustomPresenceStatus(pres_node.getFrom())
+    #userNotifications(JID(pres_node.getFrom()).getStripped())
+    #setCustomPresenceStatus(pres_node.getFrom())
     
     
     
@@ -266,7 +197,7 @@ def messageHandler(conn, mess_node):
     print ">>> MESSAGE", tipo, mess_node.getFrom(), body 
 
     if body:
-        if jid in CONFIG['admins']:
+        """if jid in CONFIG['admins']:
             if body.lower() == "quit":
                 crawler.stop()
                 sys.exit()
@@ -290,26 +221,19 @@ def messageHandler(conn, mess_node):
                     reply += "\n%r" % eval(body[5:])
                 except:
                      reply += "\nAlgo ha fallado... :(\n\n%r" % sys.exc_info()[0]
+        """
+        
         
         """Add new feeds"""
         if body.startswith("add http"):
             reply = "*Feed added*"
             feed = body[4:].strip()
             
-            if users.get(jid) and feed in users[jid].feeds and feeds.get(feed) and jid in feeds[feed].users:
+            ok = users.add_feed(jid, feed)
+            if not ok:
                 reply += "\nThe feed %s is already added for %s" % (feed, jid)
             else:
-                if not users.get(jid):
-                    users.add(jid, CUser(jid))
-                if not feeds.get(feed):
-                    feeds.add(feed, CFeed(feed))
-                if not feed in users[jid].feeds:
-                    users[jid].feeds.add(feed)
-                if not jid in feeds[feed].users:
-                    feeds[feed].users.add(jid)
-
-                conndurus.commit()
-                reply += "\nURL: %s\nJID: %s\n\nWhen I see new items I'll send you. The first time don't count." % (feed, jid)
+                reply += "\nURL: %s\nJID: %s\n\nNow you'll start to receive the new entry items." % (feed, jid)
             
             
         """List your feeds"""
@@ -318,20 +242,22 @@ def messageHandler(conn, mess_node):
             if not users.get(jid):
                 reply += "\nYou haven't URL feeds yet."
             else:
-                for feed in users[jid].feeds:
-                    reply += "\n- %s (%d users)" % (feed, len(feeds[feed].users))
-                    
+                for feed in users[jid].feeds.keys():
+                    reply += "\n- %s (%d users)" % (feed.url, len(feed.users))
+
+
         """Delete a feed"""
-        if body.startswith("del http"):
+        """if body.startswith("del http"):
             reply = "*Feed deleted*"
             feed = body[4:].strip()
-            if users.get(jid) and feed in users[jid].feeds and feeds.get(feed) and jid in feeds[feed].users:
-                users[jid].feeds.remove(feed)
+            if users.get(jid) and users[jid].feeds.has_key(feed) and feeds.get(feed) and jid in feeds[feed].users:
+                del users[jid].feeds[feed]
                 feeds[feed].users.remove(jid)
                 conndurus.commit()
                 reply += "\nURL: %s\nJID: %s\n\nNotifications for this feed closed." % (feed, jid)
             else:
                 reply += "\n%s isn't subscribed in %s" % (jid, feed)
+        """
 
 
     """If we compose a reply to the user, we send it"""
@@ -372,8 +298,8 @@ if __name__ == "__main__":
         XMPP.sendInitPresence()
         
         global crawler
-        crawler = JFNCrawler()
-        crawler.start()
+        #crawler = JFNCrawler()
+        #crawler.start()
     
         while 1:
             XMPP.Process(1)
