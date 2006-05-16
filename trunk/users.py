@@ -55,6 +55,10 @@ class CUsers(Persistent):
             root['feeds'] = CFeeds()
         self.data = root['users']
         self.feeds = root['feeds']
+        self.save()
+        
+        
+    def save(self):
         self.conndurus.commit()
         
         
@@ -74,7 +78,7 @@ class CUsers(Persistent):
         oku = self.data[jid].subs_feed(self.feeds[feed])
         okf = self.feeds[feed].add_user(self.data[jid])
             
-        self.conndurus.commit()
+        self.save()
         
         return oku and okf
         
@@ -88,10 +92,14 @@ class CUsers(Persistent):
         oku = self.data[jid].unsubs_feed(tempfeed)
         okf = self.feeds[feed].del_user(tempuser)
             
-        self.conndurus.commit()
+        self.save()
         
         return oku and okf
         
     
     def get(self, key):
         return self.data.get(key)
+
+
+    def get_feed_urls(self):
+        return feeds.keys()
