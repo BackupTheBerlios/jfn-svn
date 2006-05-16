@@ -99,7 +99,3 @@ class CUsers(Persistent):
     
     def get(self, key):
         return self.data.get(key)
-
-
-    def get_feed_urls(self):
-        return feeds.keys()
