@@ -58,3 +58,6 @@ class CFeeds(Persistent):
 
     def keys(self):
         return self.data.keys()
+
+    def values(self):
+        return self.data.values()
