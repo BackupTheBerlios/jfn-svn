@@ -21,11 +21,11 @@ class JFNFeedChecker:
         """Retrieve and parse a feed""" 
         #try:
         txt = None
-        fp = feedparser.parse(_feed.url)
+        fp = feedparser.parse(self._feed.url)
 
         #update feed basic data
-        if fp.feed.get('title'): _feed.title = fp.feed.title
-        if fp.feed.get('link'): _feed.url = fp.feed.link
+        if fp.feed.get('title'): self._feed.title = fp.feed.title
+        if fp.feed.get('link'): self._feed.url = fp.feed.link
         
         # if there are items
         if fp.get('entries') and len(fp.entries) > 0:
@@ -45,10 +45,10 @@ class JFNFeedChecker:
                 # generate the item hash
                 temphash = sha.new( repr(title) + repr(link) + repr(summary) ).hexdigest()
 
-                if not temphash in _feed.last_items:
-                    _feed.last_items.append(temphash)
+                if not temphash in self._feed.last_items:
+                    self._feed.last_items.append(temphash)
                     # ...add this item for each user
-                    for user in _feed.users:
+                    for user in self._feed.users:
                         ci = CItem()
                         ci.title = title
                         ci.text = summary
