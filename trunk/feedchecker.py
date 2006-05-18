@@ -25,7 +25,9 @@ class JFNFeedChecker:
 
         #update feed basic data
         if fp.feed.get('title'): self._feed.title = fp.feed.title
-        if fp.feed.get('link'): self._feed.url = fp.feed.link
+        if fp.feed.get('link'): self._feed.link = fp.feed.link
+        if fp.get('status') and fp.status == 301 and fp.get('href'):
+            self._feed.url = fp.href
         
         # if there are items
         if fp.get('entries') and len(fp.entries) > 0:
