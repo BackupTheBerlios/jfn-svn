@@ -99,3 +99,9 @@ class CUsers(Persistent):
     
     def get(self, key):
         return self.data.get(key)
+
+    def keys(self):
+        return self.data.keys()
+
+    def values(self):
+        return self.data.values()
