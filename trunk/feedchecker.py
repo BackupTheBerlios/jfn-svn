@@ -35,15 +35,15 @@ class JFNFeedChecker:
                 # clean data
                 title = ''
                 link = ''
-                summary = ''
+                text = ''
                 updated = ''
                 if entry.get('title'): title = entry.title
-                if entry.get('link'): title = entry.link
-                if entry.get('summary'): title = entry.summary
-                if entry.get('updated'): title = entry.updated
+                if entry.get('link'): link = entry.link
+                if entry.get('summary'): text = entry.summary
+                if entry.get('updated'): updated = entry.updated
                 
                 # generate the item hash
-                temphash = sha.new( repr(title) + repr(link) + repr(summary) ).hexdigest()
+                temphash = sha.new( repr(title) + repr(link) + repr(text) ).hexdigest()
 
                 if not temphash in self._feed.last_items:
                     self._feed.last_items.append(temphash)
@@ -51,17 +51,17 @@ class JFNFeedChecker:
                     for user in self._feed.users:
                         ci = CItem()
                         ci.title = title
-                        ci.text = summary
+                        ci.text = text
                         ci.permalink = link
-                        ci.dte = updated
+                        ci.date = updated
                         user.items_pending.append(ci)
                         
                         # delete oldest items from users, no more than 100
                         while len(user.items_pending) > 100:
-                            users[userjid].items_pending.pop(0)
+                            user.items_pending.pop(0)
                 # delete oldest hashes from feeds, no more than 50
-                while len(feed.last_items) > 50:
-                    feed.last_items.pop(pop)
+                while len(self._feed.last_items) > 50:
+                    self._feed.last_items.pop(pop)
 
         #except:
         #    for ajid in CONFIG['admins']:
