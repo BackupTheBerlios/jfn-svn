@@ -6,13 +6,11 @@ sys.path.insert(1, '.')
 import os
 import threading
 import time
-import sha
-import base64
 import re
 from xmpp import *
-import feedparser
 from config import CONFIG
 from users import CUsers
+from feedchecker import JFNFeedChecker
 
 
 
@@ -21,84 +19,26 @@ users = CUsers()
 
 
 class JFNCrawler(threading.Thread):
-    def __init__(self, stp=False):
+    def __init__(self, stop=False):
         threading.Thread.__init__(self)
-        self._stp = stp
-        self.nexturl = '' # next url for check
+        self._stop = stop
+        
         
     def run(self):
-        while not self._stp:
-            time.sleep(1)
-            urls = feeds.keys()
-            for url in urls:
-                self.checkFeed(url)
-                self.feedNotifications(url)
-                conndurus.commit()
+        fc = JFNFeedChecker()
+        while not self._stop:
+            feeds = users.feeds.values()
+            for feed in feeds:
+                fc.new(feed)
+                fc.check()
+                #self.feedNotifications(url) # this will be handled by another thread
+                time.sleep(60 / len(feeds))
+                
                 
     def stop(self):
         """Method to kill the thread"""
-        self._stp = True
-        
-    def getNextUrl(self):
-        """Return the next url for check"""
-        return self.nexturl
+        self._stop = True
 
-    def checkFeed(self, feedUrl):
-        """Retrieve and parse a feed""" 
-        #try:
-        txt = None
-        feed = feeds[feedUrl]
-        fp = feedparser.parse(feedUrl)
-
-        #update feed basic data
-        if fp.feed.get('title'): feed.title = fp.feed.title
-        if fp.feed.get('link'): feed.url = fp.feed.link
-        
-        # if there are items
-        if fp.get('entries') and len(fp['entries']) > 0:
-            # ... we search the oldest
-            fp['entries'].reverse()
-            for entry in fp['entries']:
-                # generate the item hash
-                if entry.get('title'):
-                    temp = repr(entry['title'])
-                    if entry.get('link'): temp += repr(entry.link)
-                    if entry.get('summary'): temp += repr(entry.summary)
-                #else: temp = str(entry)
-                # this have a problem: UnicodeEncodeError... 
-                temphash = sha.new(temp).hexdigest()
-
-                if not temphash in feed.last_items:
-                    feed.last_items.append(temphash)
-                    # ...add this item for each user
-                    for userjid in feed.users:
-                        ci = CItem()
-                        if entry.get('title'): ci.title = entry.title
-                        if entry.get('summary'): ci.text = entry.summary
-                        if entry.get('link'): ci.permalink = entry.link
-                        if entry.get('updated'): ci.dte = entry.updated
-                        users[userjid].items_pending.append(ci)
-                        
-                        #delete obsolete items from users, no more than 100
-                        while len(users[userjid].items_pending) > 100:
-                            temp = users[userjid].items_pending[0]
-                            users[userjid].items_pending.remove(temp)
-                #delete obsolete hashes from feeds, no more than 50
-                while len(feed.last_items) > 50:
-                    temp = feed.last_items[0]
-                    feed.last_items.remove(temp)
-
-        elif fp.bozo != 0:
-            txt = "*JFN Error*\n%r\n%r" % (feedUrl, fp['bozo_exception'])
-            feed.errors += 1
-        else:
-            feed.errors = 0
-            
-        if txt and len(CONFIG['admins']) > 0:
-            for ajid in CONFIG['admins']:
-                XMPP.send(Message(to = ajid, body = txt, typ = 'chat'))
-        #except:
-            #pass
 
     def feedNotifications(self, feedUrl):
         """Send all pending items of this feed"""
@@ -108,7 +48,7 @@ class JFNCrawler(threading.Thread):
                 userNotifications(userjid, "*New* items for %s (%s)" % (feed.title, feed.url))
             else:
                 users[userjid].feeds[feed] = True
-            
+
             
             
 def userNotifications(userjid, initialtext = None):
@@ -126,13 +66,11 @@ def userNotifications(userjid, initialtext = None):
             if item.text != "": text += "\n\n%s" % (re.sub('<.*?>', '', item.text))
             text += "\n"
             XMPP.send(Message(to = user.jid, body = text, typ = 'chat'))
-            
 
 
 
 def presenceHandler(conn, pres_node):
     """Presence handler"""
-    print ">>> PRESENCE", pres_node.getFrom(), pres_node.getType(), pres_node.getShow()
     #userNotifications(JID(pres_node.getFrom()).getStripped())
     #setCustomPresenceStatus(pres_node.getFrom())
     
@@ -159,8 +97,6 @@ def setCustomPresenceStatus(to_jid):
 def subscriptionsHandler(conn, pres_node):
     """Subscription handler"""
     tipo = pres_node.getType()
-    
-    print ">>> SUBSCRIPTION", pres_node.getFrom(), tipo
     
     if tipo == "subscribe":
         p = Presence(to=pres_node.getFrom(),typ='subscribe')
@@ -195,10 +131,8 @@ def messageHandler(conn, mess_node):
     jid = JID(mess_node.getFrom()).getStripped()
     res = JID(mess_node.getFrom()).getResource()
     
-    print ">>> MESSAGE", tipo, mess_node.getFrom(), body 
-
     if body:
-        """if jid in CONFIG['admins']:
+        if jid in CONFIG['admins']:
             if body.lower() == "quit":
                 crawler.stop()
                 sys.exit()
@@ -222,7 +156,6 @@ def messageHandler(conn, mess_node):
                     reply += "\n%r" % eval(body[5:])
                 except:
                      reply += "\nAlgo ha fallado... :(\n\n%r" % sys.exc_info()[0]
-        """
         
         
         """Show the help"""
@@ -317,8 +250,8 @@ if __name__ == "__main__":
         XMPP.sendInitPresence()
         
         global crawler
-        #crawler = JFNCrawler()
-        #crawler.start()
+        crawler = JFNCrawler()
+        crawler.start()
     
         while 1:
             XMPP.Process(1)
