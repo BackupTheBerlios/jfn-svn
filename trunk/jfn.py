@@ -253,7 +253,7 @@ if __name__ == "__main__":
     try:
         # Born a client
         global XMPP
-        XMPP = Client(CONFIG['jid'].getDomain())
+        XMPP = Client(CONFIG['jid'].getDomain())#, debug=[])
         
         # ...connect it to SSL port directly
         if not XMPP.connect(server = (CONFIG['server'], CONFIG['port'])):
