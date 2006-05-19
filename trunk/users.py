@@ -41,6 +41,14 @@ class CUser(Persistent):
             if x.url == feeditem.url:
                 return True
         return False
+        
+        
+    def enableNotifications(self, feeditem):
+        self.feeds[feeditem] = True
+        
+        
+    def getNotification(self, feeditem):
+        return self.feeds[feeditem]
 
 
 class CUsers(Persistent):
@@ -69,13 +77,16 @@ class CUsers(Persistent):
     def add_feed(self, jid, feed):
         """Add an user if not exists and subscribe the feed url, if not exists.
         """
+        
+        fn = True # first notification?
 
         if not self.data.get(jid):
             self.data[jid] = CUser(jid)
         if not self.feeds.get(feed):
             self.feeds[feed] = CFeed(feed)
+            fn = False
             
-        oku = self.data[jid].subs_feed(self.feeds[feed])
+        oku = self.data[jid].subs_feed(self.feeds[feed], fn)
         okf = self.feeds[feed].add_user(self.data[jid])
             
         self.save()
