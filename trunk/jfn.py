@@ -157,6 +157,7 @@ def messageHandler(conn, mess_node):
     res = JID(mess_node.getFrom()).getResource()
     
     if body:
+        """
         if jid in CONFIG['admins']:
             if body.lower() == "quit":
                 crawler.stop()
@@ -182,7 +183,7 @@ def messageHandler(conn, mess_node):
                     reply += "\n%r" % eval(body[5:])
                 except:
                      reply += "\nAlgo ha fallado... :(\n\n%r" % sys.exc_info()[0]
-        
+        """
         
         """Show the help"""
         if body.startswith("help"):
