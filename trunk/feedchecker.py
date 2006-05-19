@@ -49,22 +49,30 @@ class JFNFeedChecker:
     
                     if not temphash in self._feed.last_items:
                         self._feed.last_items.append(temphash)
-                        # ...add this item for each user
+                        # ...add this item for each user, if not False
                         for user in self._feed.users:
-                            ci = CItem()
-                            ci.title = title
-                            ci.text = text
-                            ci.permalink = link
-                            ci.date = updated
-                            ci.feed = self._feed
-                            user.items_pending.append(ci)
-                            
-                            # delete oldest items from users, no more than 100
-                            while len(user.items_pending) > 100:
-                                user.items_pending.pop(0)
+                            if user.getNotification(self._feed):
+                                ci = CItem()
+                                ci.title = title
+                                ci.text = text
+                                ci.permalink = link
+                                ci.date = updated
+                                ci.feed = self._feed
+                                user.items_pending.append(ci)
+                                
+                                # delete oldest items from users, no more than 100
+                                while len(user.items_pending) > 100:
+                                    user.items_pending.pop(0)
+    
                     # delete oldest hashes from feeds, no more than 50
                     while len(self._feed.last_items) > 50:
-                        self._feed.last_items.pop(pop)
+                        self._feed.last_items.pop(0)
+            
+            # finally, we enabled the notifications for this feed and user. only
+            #  the first time we skip the notification, to make the cache items. 
+            for user in self._feed.users:
+                if not user.getNotification(self._feed):
+                    user.enableNotifications(self._feed)
 
         except:
             pass
