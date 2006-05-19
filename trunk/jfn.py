@@ -18,6 +18,8 @@ users = CUsers()
 
 
 
+# JFNCrawler JFNCrawler JFNCrawler JFNCrawler JFNCrawler JFNCrawler JFNCrawler
+
 class JFNCrawler(threading.Thread):
     def __init__(self, stop=False):
         threading.Thread.__init__(self)
@@ -28,11 +30,10 @@ class JFNCrawler(threading.Thread):
         fc = JFNFeedChecker()
         while not self._stop:
             feeds = users.feeds.values()
+            time.sleep(60 / (len(feeds) + 1))
             for feed in feeds:
                 fc.new(feed)
                 fc.check()
-                #self.feedNotifications(url) # this will be handled by another thread
-                time.sleep(60 / len(feeds))
                 
                 
     def stop(self):
@@ -40,6 +41,61 @@ class JFNCrawler(threading.Thread):
         self._stop = True
 
 
+
+# JFNotifier JFNotifier JFNotifier JFNotifier JFNotifier JFNotifier JFNotifier
+
+class JFNotifier(threading.Thread):
+    def __init__(self, stop=False):
+        threading.Thread.__init__(self)
+        self._stop = stop
+        
+        
+    def run(self):
+        while not self._stop:
+            usrs = users.values()
+            time.sleep(60 / (len(usrs) + 1))
+            for user in usrs:
+                if len(XMPP.getRoster().getResources(user.jid)) > 0 and len(user.items_pending) > 0:
+                    #we send all items and delete it
+                    while len(user.items_pending) > 0:
+                        item = user.items_pending.pop(0)
+                        
+                        msg = Message(
+                            to=user.jid, 
+                            typ = 'headline', 
+                            subject = re.sub('<.*?>', '', item.title), 
+                            payload = [
+                                Node(
+                                    tag='x', 
+                                    attrs={'xmlns': 'jabber:x:oob'}, 
+                                    payload=[
+                                        Node('url', payload=item.permalink), 
+                                        Node('desc', payload=re.sub('<.*?>', '', item.title))
+                                    ]
+                                )
+                            ]
+                        )
+                        text = "%s\n" % item.text
+                        text += "_" * 50
+                        text += """\nFrom "%s" (%s)""" % (item.feed.title, item.feed.link)
+                        msg.setBody(re.sub('&.*?;', '', re.sub('<.*?>', '', text)))
+                        XMPP.send(msg)
+                        
+                        
+                        #text = """*New* item for "%s" (%s)""" % (item.feed.title, item.feed.link)
+                        #text += "\n *%s*\n %s" % (re.sub('<.*?>', '', item.title), item.permalink)
+                        #if item.text != "": text += "\n \n %s" % (re.sub('<.*?>', '', item.text))
+                        #text += "\n "
+                        #XMPP.send(Message(to = user.jid, body = text, typ = 'headline'))
+                        time.sleep(0.5)
+                    users.save()
+                
+                
+    def stop(self):
+        """Method to kill the thread"""
+        self._stop = True
+        
+        
     def feedNotifications(self, feedUrl):
         """Send all pending items of this feed"""
         feed = feeds[feedUrl]
@@ -49,47 +105,13 @@ class JFNCrawler(threading.Thread):
             else:
                 users[userjid].feeds[feed] = True
 
-            
-            
-def userNotifications(userjid, initialtext = None):
-    """Send notification to some JID"""
-    user = users[userjid]
-    # if the user is conected and have pending items...
-    if len(XMPP.getRoster().getResources(user.jid)) > 0 and len(user.items_pending) > 0:
-        if initialtext:
-            XMPP.send(Message(to = user.jid, body = initialtext, typ = 'chat'))
-        user.items_pending.reverse()
-        #we send all items and delete it
-        while len(user.items_pending) > 0:
-            item = user.items_pending.pop()
-            text = "\n*%s*\n%s" % (re.sub('<.*?>', '', item.title), item.permalink)
-            if item.text != "": text += "\n\n%s" % (re.sub('<.*?>', '', item.text))
-            text += "\n"
-            XMPP.send(Message(to = user.jid, body = text, typ = 'chat'))
 
 
+# Presence Presence Presence Presence Presence Presence Presence Presence
 
 def presenceHandler(conn, pres_node):
     """Presence handler"""
-    #userNotifications(JID(pres_node.getFrom()).getStripped())
-    #setCustomPresenceStatus(pres_node.getFrom())
-    
-    
-    
-    
-def setCustomPresenceStatus(to_jid):
-    """Set up presence message status for each user"""
-    jid = JID(to_jid).getStripped()
-    if users.get(jid):
-        p_i = len(users[jid].items_pending)
-        statusmsg = "You haven't pending items."
-        if p_i > 0:
-            statusmsg = "You have %d item" % p_i
-            if p_i > 1:
-                 statusmsg += "s"
-            statusmsg += " unreaded."
-        p = Presence(to=to_jid, status=statusmsg)
-        XMPP.send(p)
+    pass
     
     
 
@@ -112,7 +134,8 @@ def subscriptionsHandler(conn, pres_node):
         
 
 
-# reply the version request
+# IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ IQ
+
 def iqVersion(conn, iq_node):
     """IQ Version request"""
     i = Iq(typ='result', queryNS='jabber:iq:version', to=iq_node.getFrom(), 
@@ -121,7 +144,9 @@ def iqVersion(conn, iq_node):
     raise NodeProcessed
     
     
-    
+
+# Message Message Message Message Message Message Message Message Message
+
 def messageHandler(conn, mess_node):
     """Message handler"""
     body = mess_node.getBody()
@@ -135,6 +160,7 @@ def messageHandler(conn, mess_node):
         if jid in CONFIG['admins']:
             if body.lower() == "quit":
                 crawler.stop()
+                notifier.stop()
                 sys.exit()
             
             if body.lower() == "reprroster":
@@ -179,7 +205,7 @@ Example: import http://my.server.com/my_feeds.opml
                 
                 
         """Add new feeds"""
-        if body.startswith("add http"):
+        if body.startswith("add http") and "\n" not in body:
             reply = "*Feed added*"
             feed = body[4:].strip()
             
@@ -252,6 +278,9 @@ if __name__ == "__main__":
         global crawler
         crawler = JFNCrawler()
         crawler.start()
+        global notifier
+        notifier = JFNotifier()
+        notifier.start()
     
         while 1:
             XMPP.Process(1)
@@ -259,6 +288,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print u"\nKeyboardInterrupt..."
         crawler.stop()
+        notifier.stop()
         sys.exit(1)
         
     #except:
