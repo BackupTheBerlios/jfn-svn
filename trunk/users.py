@@ -88,9 +88,11 @@ class CUsers(Persistent):
 
         tempfeed = self.feeds.get(feed)
         tempuser = self.data.get(jid)
-            
-        oku = self.data[jid].unsubs_feed(tempfeed)
-        okf = self.feeds[feed].del_user(tempuser)
+        
+        if tempuser: oku = self.data[jid].unsubs_feed(tempfeed)
+        else: oku = False
+        if tempfeed: okf = self.feeds[feed].del_user(tempuser)
+        else: okf = False
             
         self.save()
         
