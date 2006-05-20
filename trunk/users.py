@@ -49,6 +49,10 @@ class CUser(Persistent):
         
     def getNotification(self, feeditem):
         return self.feeds[feeditem]
+        
+    
+    def clear_items(self):
+        self.items_pending = PersistentList()
 
 
 class CUsers(Persistent):
