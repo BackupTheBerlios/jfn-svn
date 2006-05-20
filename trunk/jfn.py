@@ -87,7 +87,11 @@ class JFNotifier(threading.Thread):
                         #if item.text != "": text += "\n \n %s" % (re.sub('<.*?>', '', item.text))
                         #text += "\n "
                         #XMPP.send(Message(to = user.jid, body = text, typ = 'headline'))
+                        
+                        # wait 0.5 secs
                         time.sleep(0.5)
+                    
+                    user.clear_items()
                     users.save()
                 
                 
@@ -201,6 +205,9 @@ Example: list
 
 _IMPORT_ - This allow you to send a full OPML file with all your feeds and immediately subscribe all them.
 Example: import http://my.server.com/my_feeds.opml
+(currently not available)
+
+_SET_ - Configure the system for you. Available options are:
 (currently not available)
             """
                 
