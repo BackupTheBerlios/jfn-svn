@@ -47,7 +47,9 @@ class JFNFeedChecker:
                     # generate the item hash
                     temphash = sha.new( repr(title) + repr(link) + repr(text) ).hexdigest()
     
-                    if not temphash in self._feed.last_items:
+                    # if this hash isn't cached, we do it and senditem for each
+                    # user
+                    if temphash not in self._feed.last_items:
                         self._feed.last_items.append(temphash)
                         # ...add this item for each user, if not False
                         for user in self._feed.users:
@@ -61,11 +63,11 @@ class JFNFeedChecker:
                                 user.items_pending.append(ci)
                                 
                                 # delete oldest items from users, no more than 100
-                                while len(user.items_pending) > 100:
-                                    user.items_pending.pop(0)
+                            while len(user.items_pending) > 100:
+                                user.items_pending.pop(0)
     
-                    # delete oldest hashes from feeds, no more than 50
-                    while len(self._feed.last_items) > 50:
+                    # delete oldest hashes from feeds, no more than 100
+                    while len(self._feed.last_items) > 100:
                         self._feed.last_items.pop(0)
             
             # finally, we enabled the notifications for this feed and user. only
