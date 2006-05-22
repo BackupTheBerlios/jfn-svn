@@ -6,6 +6,7 @@ And...
 - [OK]  Modular schema
 - [10]  Web output
 - [50]  Miltilingual support
+- [100] HTTP Cache control
 
 Legend:
 [0-9]+ = Priority
