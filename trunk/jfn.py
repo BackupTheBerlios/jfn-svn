@@ -53,46 +53,55 @@ class JFNotifier(threading.Thread):
     def run(self):
         while not self._stop:
             usrs = users.values()
-            time.sleep(60 / (len(usrs) + 1))
+            time.sleep((60 * 60) / (len(usrs) + 1))
             for user in usrs:
-                if len(XMPP.getRoster().getResources(user.jid)) > 0 and len(user.items_pending) > 0:
-                    #we send all items and delete it
-                    while len(user.items_pending) > 0:
-                        item = user.items_pending.pop(0)
-                        
-                        msg = Message(
-                            to=user.jid, 
-                            typ = 'headline', 
-                            subject = re.sub('<.*?>', '', item.title), 
-                            payload = [
-                                Node(
-                                    tag='x', 
-                                    attrs={'xmlns': 'jabber:x:oob'}, 
-                                    payload=[
-                                        Node('url', payload=item.permalink), 
-                                        Node('desc', payload=re.sub('<.*?>', '', item.title))
-                                    ]
-                                )
-                            ]
-                        )
-                        text = "%s\n" % item.text
-                        text += "_" * 50
-                        text += """\nFrom "%s" (%s)""" % (item.feed.title, item.feed.link)
-                        msg.setBody(re.sub('&.*?;', '', re.sub('<.*?>', '', text)))
-                        XMPP.send(msg)
-                        
-                        
-                        #text = """*New* item for "%s" (%s)""" % (item.feed.title, item.feed.link)
-                        #text += "\n *%s*\n %s" % (re.sub('<.*?>', '', item.title), item.permalink)
-                        #if item.text != "": text += "\n \n %s" % (re.sub('<.*?>', '', item.text))
-                        #text += "\n "
-                        #XMPP.send(Message(to = user.jid, body = text, typ = 'headline'))
-                        
-                        # wait 0.5 secs
-                        time.sleep(0.5)
-                    
-                    user.clear_items()
-                    users.save()
+                if XMPP.getRoster().getItem(user.jid):
+                    # if user is online
+                    for resource, resdata in XMPP.getRoster().getItem(user.jid)['resources'].iteritems():
+                        # when
+                        oa = user.getConfig('onlyavailable')
+                        if not (oa == "on" and not (not resdata['show'] or resdata['show'] == 'chat')):
+                            #we send all items and delete it
+                            while len(user.items_pending) > 0:
+                                item = user.items_pending.pop(0)
+                                
+                                # how to send the notification?
+                                hl = user.getConfig('useheadline')
+                                if not hl or hl == "on":
+                                    msg = Message(
+                                        to=user.jid + '/' + resource, 
+                                        typ = 'headline', 
+                                        subject = re.sub('<.*?>', '', item.title), 
+                                        payload = [
+                                            Node(
+                                                tag='x', 
+                                                attrs={'xmlns': 'jabber:x:oob'}, 
+                                                payload=[
+                                                    Node('url', payload=item.permalink), 
+                                                    Node('desc', payload=re.sub('<.*?>', '', item.title))
+                                                ]
+                                            )
+                                        ]
+                                    )
+                                    text = "%s\n" % item.text
+                                    text += "_" * 50
+                                    text += """\nFrom "%s" (%s)""" % (item.feed.title, item.feed.link)
+                                    msg.setBody(re.sub('&.*?;', '', re.sub('<.*?>', '', text)))
+                                    
+                                else:
+                                    text = """*New* item for "%s" (%s)""" % (item.feed.title, item.feed.link)
+                                    text += "\n *%s*\n %s" % (re.sub('<.*?>', '', item.title), item.permalink)
+                                    if item.text != "": text += "\n \n %s" % (re.sub('<.*?>', '', item.text))
+                                    text += "\n "
+                                    text = re.sub('&.*?;', '', re.sub('<.*?>', '', text))
+                                    msg = Message(to = user.jid + '/' + resource, body = text, typ = 'chat')
+                                    
+                                XMPP.send(msg)
+                                # wait 0.5 secs
+                                time.sleep(0.5)
+                            
+                            user.clear_items()
+                            users.save()
                 
                 
     def stop(self):
@@ -142,8 +151,16 @@ def subscriptionsHandler(conn, pres_node):
 
 def iqVersion(conn, iq_node):
     """IQ Version request"""
-    i = Iq(typ='result', queryNS='jabber:iq:version', to=iq_node.getFrom(), 
-            payload=[Node('name',payload=['xmpppy'])])
+    i = Iq(
+        typ='result', 
+        queryNS='jabber:iq:version', 
+        to=iq_node.getFrom(),
+        attrs={'id': iq_node.getID()}, 
+        payload=[
+            Node('name', payload=['xmpppy']),
+            Node('os', payload=[os.name.upper()])
+        ]
+    )
     conn.send(i)
     raise NodeProcessed
     
@@ -189,6 +206,7 @@ def messageHandler(conn, mess_node):
                      reply += "\nAlgo ha fallado... :(\n\n%r" % sys.exc_info()[0]
         """
         
+        
         """Show the help"""
         if body.startswith("help"):
             reply = """*Help*
@@ -207,8 +225,13 @@ _IMPORT_ - This allow you to send a full OPML file with all your feeds and immed
 Example: import http://my.server.com/my_feeds.opml
 (currently not available)
 
-_SET_ - Configure the system for you. Available options are:
-(currently not available)
+_SET_ - Configure the system. Available options are:
+ USEHEADLINE on|off - This set the method to send you each new item, by headline or not. You need a client with headline message support. Default: 'on'.
+ ONLYAVAILABLE on|off - Send you notifications only when you are available/ready for chat, or when you are away too. You'll never was notified on offline. Default: 'off'.
+Example: set useheadline on
+
+_STATUS_ - Show information like you configuration, and more.
+Example: status
             """
                 
                 
@@ -244,7 +267,36 @@ _SET_ - Configure the system for you. Available options are:
                 reply += "\n%s isn't subscribed for %s" % (jid, feed)
             else:
                 reply += "\nURL: %s\nJID: %s\n\nEnded your notifications for this feed." % (feed, jid)
-
+                
+                
+        """Set ups"""
+        if body.startswith("set ") and "\n" not in body:
+            reply = "*Set up*"
+            actions = ['useheadline', 'onlyavailable']
+            modes = ['on', 'off']
+            
+            if len(body.split(' ')) == 3:
+                action = body.split(' ')[1]
+                mode = body.split(' ')[2]
+                if action in actions and mode in modes:
+                    ok = users.setup(jid, action, mode)
+                    if ok:
+                        reply += "\nChanges saved."
+                    else:
+                        reply += "\nError. Type 'help' for more information."
+                else:
+                    reply += "\nBad arguments. Type 'help' to see the options."
+            else:
+                reply += "\nBad format. Type 'help' to see an example."
+                
+            
+        """List your feeds"""
+        if body == "status":
+            reply = "*Status*"
+            reply += "\nNotifications method: " + users.notification_method(jid)
+            reply += "\nNotifications when: " + users.notification_when(jid)
+            reply += "\nSubscribed feeds: " + users.len_feeds(jid)
+            
 
     """If we compose a reply to the user, we send it"""
     if reply:
