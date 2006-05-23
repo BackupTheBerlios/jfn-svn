@@ -1,0 +1,21 @@
+#! /bin/bash
+
+case "$1" in
+	'start')
+		echo "" > nohup.out
+		nohup python jfn.py &
+         ;;
+	'stop')
+		kill -9 $(ps ax | grep jfn.py | awk '{print $1}')
+		;;
+	'status')
+		if [ `ps aux | grep -c jfn.py` -lt 2 ]; then
+			echo "JFN is stopped."
+		else
+			echo "JFN is started."
+		fi
+		;;
+	*)
+		echo "Usage: $0 [start|stop]"
+		;;
+esac
